@@ -97,8 +97,9 @@ Resources:
 
   ApiKey:
     Type: AWS::ApiGateway::ApiKey
+    DependsOn: ApiDeployment
     Properties:
-      Name: FastApiKey
+      Name: !Sub "FastApiKey-${AWS::StackName}"
       Enabled: true
       StageKeys:
         - RestApiId: !Ref ApiGatewayRestApi
@@ -106,6 +107,7 @@ Resources:
 
   UsagePlan:
     Type: AWS::ApiGateway::UsagePlan
+    DependsOn: ApiKey
     Properties:
       UsagePlanName: FastApiUsagePlan
       ApiStages:
@@ -114,6 +116,7 @@ Resources:
 
   UsagePlanKey:
     Type: AWS::ApiGateway::UsagePlanKey
+    DependsOn: UsagePlan
     Properties:
       KeyId: !Ref ApiKey
       KeyType: API_KEY
