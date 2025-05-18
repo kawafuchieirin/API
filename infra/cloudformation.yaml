@@ -59,7 +59,7 @@ Resources:
       Integration:
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
-        Uri: 
+        Uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FastApiLambdaFunction.Arn}/invocations
 
   ApiGatewayMethodPost:
@@ -73,7 +73,7 @@ Resources:
       Integration:
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
-        Uri: 
+        Uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FastApiLambdaFunction.Arn}/invocations
 
   ApiDeployment:
@@ -84,6 +84,7 @@ Resources:
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       StageName: prod
+      Description: !Sub "Deployed at ${AWS::StackName} - ${AWS::Region} - ${AWS::AccountId}"
 
   LambdaPermissionApiGateway:
     Type: AWS::Lambda::Permission
@@ -91,7 +92,7 @@ Resources:
       FunctionName: !Ref FastApiLambdaFunction
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: 
+      SourceArn:
         Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/*
 
   ApiKey:
@@ -120,7 +121,10 @@ Resources:
 
 Outputs:
   ApiEndpoint:
-    Value: 
+    Description: Public endpoint for the FastAPI application
+    Value:
       Fn::Sub: https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod/
+
   ApiKey:
+    Description: API Key for accessing the endpoint
     Value: !Ref ApiKey
