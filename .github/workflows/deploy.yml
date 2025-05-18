@@ -3,7 +3,7 @@ name: Deploy FastAPI to AWS Lambda
 on:
   push:
     branches:
-      - main  # デプロイ対象ブランチ
+      - main
 
 env:
   AWS_REGION: ap-northeast-1
@@ -27,28 +27,47 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::412420079063:role/GitHubActionsOIDCRole
-          aws-region: ap-northeast-1
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Delete existing CloudFormation stack (if exists)
+        run: |
+          set +e
+          echo "Checking for existing stack: $STACK_NAME"
+          aws cloudformation describe-stacks --stack-name $STACK_NAME > /dev/null 2>&1
+          if [ $? -eq 0 ]; then
+            echo "Deleting existing stack: $STACK_NAME"
+            aws cloudformation delete-stack --stack-name $STACK_NAME
+            echo "Waiting for stack deletion to complete..."
+            aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
+            echo "Stack deleted."
+            sleep 10
+          else
+            echo "No existing stack found."
+          fi
+          set -e
 
       - name: Log in to Amazon ECR
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - name: Build, Tag and Push Docker image to ECR
+        id: build_image
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          IMAGE_URI=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest
-          docker build -t ${ECR_REPOSITORY} .
-          docker tag ${ECR_REPOSITORY}:latest ${IMAGE_URI}
-          docker push ${IMAGE_URI}
-          echo "ECR_IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
+          IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+          docker build -t $ECR_REPOSITORY .
+          docker tag $ECR_REPOSITORY:latest $IMAGE_URI
+          docker push $IMAGE_URI
 
       - name: Deploy to CloudFormation
         run: |
+          echo "Deploying with image: $ECR_IMAGE_URI"
           aws cloudformation deploy \
             --template-file infra/cloudformation.yaml \
-            --stack-name ${STACK_NAME} \
+            --stack-name $STACK_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides \
-              LambdaFunctionName=${FUNCTION_NAME} \
-              ECRImageUri=${ECR_IMAGE_URI}
+              LambdaFunctionName=$FUNCTION_NAME \
+              ECRImageUri=$ECR_IMAGE_URI
