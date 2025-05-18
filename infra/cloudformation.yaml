@@ -29,7 +29,7 @@ Resources:
   FastApiLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Ref LambdaFunctionName
+      FunctionName: !Sub "${LambdaFunctionName}-${AWS::StackName}"
       PackageType: Image
       Code:
         ImageUri: !Ref ECRImageUri
