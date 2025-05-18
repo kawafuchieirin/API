@@ -66,7 +66,7 @@ jobs:
         run: |
           echo "🚀 Deploying with image: ${{ steps.build_image.outputs.image_uri }}"
           aws cloudformation deploy \
-            --template-file cloudformation.yaml \
+            --template-file infra/cloudformation.yaml \
             --stack-name $STACK_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides \
