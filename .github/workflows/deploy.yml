@@ -1,0 +1,53 @@
+name: Deploy FastAPI to AWS Lambda
+
+on:
+  push:
+    branches:
+      - main  # デプロイ対象ブランチ
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_REPOSITORY: fastapi-lambda-api
+  STACK_NAME: fastapi-lambda-stack
+  FUNCTION_NAME: FastApiLambdaFunction
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::412420079063:role/GitHubActionsOIDCRole
+          aws-region: ap-northeast-1
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+      - name: Build, Tag and Push Docker image to ECR
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          IMAGE_URI=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest
+          docker build -t ${ECR_REPOSITORY} .
+          docker tag ${ECR_REPOSITORY}:latest ${IMAGE_URI}
+          docker push ${IMAGE_URI}
+          echo "ECR_IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
+
+      - name: Deploy to CloudFormation
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cloudformation.yaml \
+            --stack-name ${STACK_NAME} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              LambdaFunctionName=${FUNCTION_NAME} \
+              ECRImageUri=${ECR_IMAGE_URI}
