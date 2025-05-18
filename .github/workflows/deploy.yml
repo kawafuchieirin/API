@@ -56,18 +56,19 @@ jobs:
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
-          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+          echo "🔧 Docker image URI: $IMAGE_URI"
           docker build -t $ECR_REPOSITORY .
           docker tag $ECR_REPOSITORY:latest $IMAGE_URI
           docker push $IMAGE_URI
+          echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
       - name: Deploy to CloudFormation
         run: |
-          echo "Deploying with image: $ECR_IMAGE_URI"
+          echo "🚀 Deploying with image: ${{ steps.build_image.outputs.image_uri }}"
           aws cloudformation deploy \
             --template-file infra/cloudformation.yaml \
             --stack-name $STACK_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides \
               LambdaFunctionName=$FUNCTION_NAME \
-              ECRImageUri=$ECR_IMAGE_URI
+              ECRImageUri=${{ steps.build_image.outputs.image_uri }}
